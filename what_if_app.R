@@ -8,19 +8,29 @@ library(DT)
 
 
 # Main data
-df <- read_csv("process_name,true_positives,false_negatives,false_positives,true_negatives
-    1. Current State,10000,0,90000,0
-    2. Ideal State,10000,0,0,90000
-    3. Wide Net Proposal,9900,100,86150,3850
-    4. Medium Net Proposal,7500,2500,40000,50000
-    5. Narrow Net Proposal,2000,8000,2500,87500
-    6. Goal,8000,2000,30000,60000") 
+df <- read_csv("process_name,true_positives,false_negatives,false_positives,true_negatives,sensitivity,specificity
+    1. Current State,10000,0,90000,0,1,0
+    2. Ideal State,10000,0,0,90000,1,1
+    3. Wide Net Proposal,9900,100,86150,3850,.99,.043
+    4. Medium Net Proposal,7500,2500,40000,50000,.75,.55
+    5. Narrow Net Proposal,2000,8000,2500,87500,.2,.97
+    6. Goal,8000,2000,30000,60000,.8,.67") 
 
 ui <- fluidPage(
   
   titlePanel("What if scenarios"),
   sidebarLayout(
     sidebarPanel(width = 3,
+      
+      # Input: text input for the number of texts to be reviewed ----
+      textInput(inputId = "numberOfTexts",
+                label = "Number of Texts:",
+                value = 100000),  
+      
+      # Input: text input for the number of texts that are positives ----
+      textInput(inputId = "numberOfPositives",
+                label = "Number of Texts that should be Referred:",
+                value = 10000), 
       
       # Input: Slider for the annual cost of each reviewer ----
       sliderInput(inputId = "manualReviewCostPerYear",
@@ -57,6 +67,9 @@ ui <- fluidPage(
 server <- function(input, output) {
   
   plotData <- reactive({
+    total_texts <- as.numeric(input$numberOfTexts)
+    positive_texts <- as.numeric(input$numberOfPositives)
+    negative_texts <- total_texts - positive_texts
     workdays_each_year <- as.numeric(input$workdaysEachYear)  # 220 average
     manual_review_cost_per_year <- as.numeric(input$manualReviewCostPerYear)                                           # annual salary/benefits etc
     manual_review_cost_per_day <- manual_review_cost_per_year / workdays_each_year    # daily salary
@@ -65,13 +78,18 @@ server <- function(input, output) {
     cost_per_false_positive <- minutes_per_review * manual_review_cost_per_minute
     
     df %>% 
-      mutate(total_positives = true_positives + false_negatives,
+      mutate(true_positives = positive_texts * sensitivity,
+             false_negatives = positive_texts - true_positives,
+             false_positives = negative_texts - (negative_texts * specificity),
+             true_negatives = negative_texts * specificity,
+             total_positives = true_positives + false_negatives,
              total_negatives = false_positives + true_negatives,
              total_reviews = total_positives + total_negatives,
              cost_of_false_positives = cost_per_false_positive * false_positives,
              cost_of_false_negatives = as.numeric(input$costPerFalseNegative) * false_negatives,
              total_cost = cost_of_false_positives + cost_of_false_negatives) %>% 
-      mutate_if(is.numeric, as.integer, 0) %>% 
+      #mutate_if(is.numeric, as.integer, 0) %>% 
+      mutate_at(vars(-process_name, -specificity, -sensitivity), as.integer, 0) %>% 
       mutate(cost_of_false_positives = dollar(cost_of_false_positives),
              cost_of_false_negatives = dollar(cost_of_false_negatives),
              `Total Cost` = dollar(total_cost)) %>% 
