@@ -20,7 +20,7 @@ ui <- fluidPage(
   
   titlePanel("What if scenarios"),
   sidebarLayout(
-    sidebarPanel(
+    sidebarPanel(width = 3,
       
       # Input: Slider for the annual cost of each reviewer ----
       sliderInput(inputId = "manualReviewCostPerYear",
@@ -39,10 +39,17 @@ ui <- fluidPage(
                 label = "Estimated cost of each missed referral in dollars:",
                 value = 500),
       
+      # Input: text input for the work days per year ----
+      textInput(inputId = "workdaysEachYear",
+                label = "Estimated work days each year:",
+                value = 200),
+      
+      textOutput("Cost per minute = (Manual reviewer annual cost / workdays each year) / ( 8 hours * 60 minutes )
+                 \nTotal cost = (Cost per minute x cost of each missed referral) + (Cost per minute x cost of each manual review)")
     ),
     mainPanel(
       plotOutput(outputId = "distPlot"),
-      tableOutput(outputId = "comparisonTable")
+      DT::dataTableOutput(outputId = "comparisonTable")
     )
   )
 )
@@ -50,13 +57,12 @@ ui <- fluidPage(
 server <- function(input, output) {
   
   plotData <- reactive({
-    workdays_each_year <- 220                                                         # 220 average
+    workdays_each_year <- as.numeric(input$workdaysEachYear)  # 220 average
     manual_review_cost_per_year <- as.numeric(input$manualReviewCostPerYear)                                           # annual salary/benefits etc
     manual_review_cost_per_day <- manual_review_cost_per_year / workdays_each_year    # daily salary
     manual_review_cost_per_minute <- manual_review_cost_per_day / (8 * 60)            # salary by minute
     minutes_per_review <- as.numeric(input$minutesPerManualReview)                                                           # minutes each review takes
     cost_per_false_positive <- minutes_per_review * manual_review_cost_per_minute
-    cost_per_false_negative <- 50#as.numeric(input$costPerFalseNegative)
     
     df %>% 
       mutate(total_positives = true_positives + false_negatives,
@@ -69,18 +75,24 @@ server <- function(input, output) {
       mutate(cost_of_false_positives = dollar(cost_of_false_positives),
              cost_of_false_negatives = dollar(cost_of_false_negatives),
              total_cost = dollar(total_cost)) %>% 
-      select(process_name, total_cost, everything())
+      select(process_name, total_cost, everything()) 
   })
   
   output$distPlot <- renderPlot({
     plotData() %>%
       ggplot(aes(process_name, total_cost)) +
       geom_col() + 
-      coord_flip()
+      theme(text = element_text(size=20)) +
+            #axis.text.x = element_text(angle=90, hjust=1)) +
+      coord_flip() +
+      labs(x = "Total cost", y = "Process Name")
   })
   
-  output$comparisonTable <- renderTable({ 
-    plotData()
+  output$comparisonTable <- DT::renderDataTable({ 
+    DT::datatable(plotData(), 
+                  rownames= FALSE, 
+                  options = list(bFilter = 0,     #remove filter
+                                 bLengthChange=0))#remove number of items to display dropdown
   })
   
 }
