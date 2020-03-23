@@ -9,12 +9,12 @@ library(DT)
 
 # Main data
 df <- read_csv("process_name,true_positives,false_negatives,false_positives,true_negatives
-    1. Current State,10000,0,90000,0
-    2. Ideal State,10000,0,0,90000
-    3. Wide Net Proposal,9900,100,86150,3850
-    4. Medium Net Proposal,7500,2500,40000,50000
-    5. Narrow Net Proposal,2000,8000,2500,87500
-    6. Goal,8000,2000,30000,60000") 
+    ideal_state,10000,0,0,90000
+    current_state,10000,0,90000,0
+    wide_net,9900,100,86150,3850
+    medium_net,7500,2500,40000,50000
+    narrow_net,2000,8000,2500,87500
+    goal,8000,2000,30000,60000") 
 
 ui <- fluidPage(
   
@@ -74,23 +74,22 @@ server <- function(input, output) {
       mutate_if(is.numeric, as.integer, 0) %>% 
       mutate(cost_of_false_positives = dollar(cost_of_false_positives),
              cost_of_false_negatives = dollar(cost_of_false_negatives),
-             `Total Cost` = dollar(total_cost)) %>% 
-      select(process_name,`Total Cost`, everything()) 
+             total_cost = dollar(total_cost)) %>% 
+      select(process_name, total_cost, everything()) 
   })
   
   output$distPlot <- renderPlot({
     plotData() %>%
       ggplot(aes(process_name, total_cost)) +
       geom_col() + 
-      theme(text = element_text(size=15)) +
+      theme(text = element_text(size=20)) +
             #axis.text.x = element_text(angle=90, hjust=1)) +
       coord_flip() +
-      scale_y_continuous(labels=dollar_format(prefix="$")) +
-      labs(x = "Process Name", y = "Total cost")
+      labs(x = "Total cost", y = "Process Name")
   })
   
   output$comparisonTable <- DT::renderDataTable({ 
-    DT::datatable(plotData() %>% select(-total_cost), 
+    DT::datatable(plotData(), 
                   rownames= FALSE, 
                   options = list(bFilter = 0,     #remove filter
                                  bLengthChange=0))#remove number of items to display dropdown
