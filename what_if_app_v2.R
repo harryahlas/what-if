@@ -20,7 +20,7 @@ ui <- fluidPage(
       
       # Input: text input for the number of texts that are positives ----
       sliderInput(inputId = "issueRate",
-                label = "Number of Comments that should be Referred:",
+                label = "Percent of Comments that should be Referred:",
                 value = .015,
                 min = 0,
                 max = .25), 
@@ -48,9 +48,11 @@ ui <- fluidPage(
                 value = 4),
       
       # Input: text input for the cost of each false negative ----
-      textInput(inputId = "costPerFalseNegative",
+      sliderInput(inputId = "costPerFalseNegative",
                 label = "Estimated cost of each missed referral in dollars:",
-                value = 500),
+                value = 500,
+                min = 0,
+                max = 20000),
       
       # Input: text input for the work days per year ----
       textInput(inputId = "workdaysEachYear",
@@ -91,9 +93,9 @@ server <- function(input, output) {
     
     
     
-    total_texts <- as.numeric(input$numberOfTexts)
-    positive_texts <- as.numeric(input$numberOfPositives)
-    negative_texts <- total_texts - positive_texts
+    #total_texts <- as.numeric(input$numberOfTexts)
+    #positive_texts <- as.numeric(input$numberOfPositives)
+    #negative_texts <- total_texts - positive_texts
     workdays_each_year <- as.numeric(input$workdaysEachYear)  # 220 average
     manual_review_cost_per_year <- as.numeric(input$manualReviewCostPerYear)                                           # annual salary/benefits etc
     manual_review_cost_per_day <- manual_review_cost_per_year / workdays_each_year    # daily salary
@@ -113,9 +115,16 @@ server <- function(input, output) {
       false_positives = round(false_positives,0),
       predicted_negatives = round(predicted_negatives,0),
       false_negatives = round(false_negatives,0),
-      true_negatives = round(true_negatives,0)
+      true_negatives = round(true_negatives,0),
+      cost_per_false_positive = cost_per_false_positive
     ) %>% 
-      pivot_longer(everything(), names_to = "Variable")
+      mutate(    
+        cost_of_false_positives = round(cost_per_false_positive * false_positives, 2),
+        cost_per_false_negative = round(as.numeric(input$costPerFalseNegative)),
+        cost_of_false_negatives = round(cost_per_false_negative * false_negatives, 2),
+        total_cost = cost_of_false_positives + cost_of_false_negatives) %>%
+      pivot_longer(everything(), names_to = "Variable") %>% 
+      mutate(Variable = format(Variable, big.mark=","))
     
     
     
@@ -153,7 +162,7 @@ server <- function(input, output) {
   output$comparisonTable <- DT::renderDataTable({ 
     DT::datatable(plotData(),# %>% select(-total_cost), 
                   rownames= FALSE, 
-                  options = list(pageLength = 15, #rows to show
+                  options = list(pageLength = 20, #rows to show
                                  bFilter = 0,     #remove filter
                                  bLengthChange=0))#remove number of items to display dropdown
   })
